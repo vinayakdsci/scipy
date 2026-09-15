@@ -2,7 +2,7 @@
   :target: https://scipy.org
   :width: 110
   :height: 110
-  :align: left 
+  :align: left
 
 .. image:: https://img.shields.io/badge/powered%20by-NumFOCUS-orange.svg?style=flat&colorA=E1523D&colorB=007D8A
   :target: https://numfocus.org
@@ -13,11 +13,14 @@
 .. image:: https://img.shields.io/conda/dn/conda-forge/scipy.svg?label=Conda%20downloads
   :target: https://anaconda.org/conda-forge/scipy
 
-.. image:: https://img.shields.io/badge/stackoverflow-Ask%20questions-blue.svg
+.. image:: https://img.shields.io/badge/stackoverflow-Ask%20questions-blue.svg?
   :target: https://stackoverflow.com/questions/tagged/scipy
 
-.. image:: https://img.shields.io/badge/DOI-10.1038%2Fs41592--019--0686--2-blue.svg
+.. image:: https://img.shields.io/badge/DOI-10.1038%2Fs41592--019--0686--2-blue.svg?
   :target: https://www.nature.com/articles/s41592-019-0686-2
+
+.. image:: https://insights.linuxfoundation.org/api/badge/health-score?project=scipy
+  :target: https://insights.linuxfoundation.org/project/scipy
 
 SciPy (pronounced "Sigh Pie") is an open-source software for mathematics,
 science, and engineering. It includes modules for statistics, optimization,
@@ -27,12 +30,14 @@ ODE solvers, and more.
 - **Website:** https://scipy.org
 - **Documentation:** https://docs.scipy.org/doc/scipy/
 - **Development version of the documentation:** https://scipy.github.io/devdocs
-- **SciPy development forum:** https://discuss.scientific-python.org/c/contributor/scipy 
+- **SciPy development forum:** https://discuss.scientific-python.org/c/contributor/scipy
+- **Stack Overflow:** https://stackoverflow.com/questions/tagged/scipy
 - **Source code:** https://github.com/scipy/scipy
 - **Contributing:** https://scipy.github.io/devdocs/dev/index.html
 - **Bug reports:** https://github.com/scipy/scipy/issues
 - **Code of Conduct:** https://docs.scipy.org/doc/scipy/dev/conduct/code_of_conduct.html
-- **Report a security vulnerability:** https://tidelift.com/docs/security
+- **Report a security vulnerability:** via Tidelift, as explained in
+  `our docs on Security <https://scipy.github.io/devdocs/tutorial/security.html>`__
 - **Citing in your work:** https://www.scipy.org/citing-scipy/
 
 SciPy is built to work with
@@ -53,7 +58,8 @@ Call for Contributions
 
 We appreciate and welcome contributions. Small improvements or fixes are always appreciated; issues labeled as "good
 first issue" may be a good starting point. Have a look at `our contributing
-guide <https://scipy.github.io/devdocs/dev/index.html>`__.
+guide <https://scipy.github.io/devdocs/dev/index.html>`__ and familiarize yourself
+with `our AI policy <https://scipy.github.io/devdocs/dev/conduct/ai_policy.html>`__.
 
 Writing code isn’t the only way to contribute to SciPy. You can also:
 

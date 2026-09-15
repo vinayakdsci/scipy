@@ -1,4 +1,4 @@
-/*! \file
+/*
 Copyright (c) 2003, The Regents of the University of California, through
 Lawrence Berkeley National Laboratory (subject to receipt of any required 
 approvals from U.S. Dept. of Energy) 
@@ -8,24 +8,25 @@ All rights reserved.
 The source code is distributed under BSD license, see the file License.txt
 at the top-level directory.
 */
-/*! @file memory.c
- * \brief Precision-independent memory-related routines
- *
- * <pre>
+/*
  * -- SuperLU routine (version 2.0) --
  * Univ. of California Berkeley, Xerox Palo Alto Research Center,
  * and Lawrence Berkeley National Lab.
  * November 15, 1997
- * </pre>
  */
-/** Precision-independent memory-related routines.
-    (Shared by [sdcz]memory.c) **/
+/*! \file
+ * \brief Precision-independent memory-related routines
+ *
+ * Shared by [sdcz]memory.c)
+ *
+ * \ingroup Common
+ */
 
 #include "slu_ddefs.h"
 
 
 #if ( DEBUGlevel>=1 )           /* Debug malloc/free. */
-int_t superlu_malloc_total = 0;
+int64_t superlu_malloc_total = 0;
 
 #define PAD_FACTOR  2
 #define DWORD  (sizeof(double)) /* Be sure it's no smaller than double. */
@@ -115,8 +116,8 @@ SetIWork(int m, int n, int panel_size, int *iworkptr, int **segrep,
     // *marker = *xprune + n;
     *marker = *panel_lsub + panel_size * m;
     
-    ifill (*repfnz, m * panel_size, EMPTY);
-    ifill (*panel_lsub, m * panel_size, EMPTY);
+    ifill (*repfnz, m * panel_size, SLU_EMPTY);
+    ifill (*panel_lsub, m * panel_size, SLU_EMPTY);
     
     *xplore = intMalloc(m); /* can be 64 bit */
     *xprune = intMalloc(n);

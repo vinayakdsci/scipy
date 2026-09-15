@@ -3,6 +3,7 @@
 import sys
 import warnings
 import math
+from operator import mul
 
 import numpy as np
 
@@ -80,6 +81,9 @@ mclass_info = {
     mxCHAR_CLASS: 'char',
     mxSPARSE_CLASS: 'sparse',
     }
+
+
+_MAX_INTP = np.iinfo(np.intp).max
 
 
 class VarHeader4:
@@ -171,18 +175,20 @@ class VarReader4:
             of dtype given by `hdr` ``dtype`` and shape given by `hdr` ``dims``
         '''
         dt = hdr.dtype
-        dims = hdr.dims
-        num_bytes = dt.itemsize
-        for d in dims:
-            num_bytes *= d
-        buffer = self.mat_stream.read(int(num_bytes))
+        # Fast product for large (>2GB) arrays.
+        num_bytes = reduce(mul, hdr.dims, np.int64(dt.itemsize))
+        if num_bytes > _MAX_INTP:
+            raise ValueError(
+                f"Variable '{hdr.name.decode('latin1')}' has byte length "
+                f"longer than largest possible NumPy array on this platform.")
+        buffer = self.mat_stream.read(num_bytes)
         if len(buffer) != num_bytes:
-            raise ValueError(f"Not enough bytes to read matrix '{hdr.name}';"
-                             "is this a badly-formed file? "
-                             "Consider listing matrices with `whosmat` "
-                             "and loading named matrices with "
-                             "`variable_names` kwarg to `loadmat`")
-        arr = np.ndarray(shape=dims,
+            raise ValueError(
+                f"Not enough bytes to read matrix "
+                f"'{hdr.name.decode('latin1')}'; is this a badly-formed file? "
+                f"Consider listing matrices with `whosmat` and loading named "
+                f"matrices with `variable_names` kwarg to `loadmat`")
+        arr = np.ndarray(shape=hdr.dims,
                          dtype=dt,
                          buffer=buffer,
                          order='F')
@@ -239,8 +245,8 @@ class VarReader4:
 
         Returns
         -------
-        arr : ``scipy.sparse.coo_matrix``
-            with dtype ``float`` and shape read from the sparse matrix data
+        arr : coo_array
+            with dtype ``float`` and shape read from the sparse array data
 
         Notes
         -----
@@ -270,7 +276,7 @@ class VarReader4:
         else:
             V = np.ascontiguousarray(tmp[:,2],dtype='complex')
             V.imag = tmp[:,3]
-        return scipy.sparse.coo_matrix((V,(I,J)), dims)
+        return scipy.sparse.coo_array((V,(I,J)), dims)
 
     def shape_from_header(self, hdr):
         '''Read the shape of the array described by the header.
@@ -355,8 +361,8 @@ class MatFile4Reader(MatFileReader):
            position in stream of next variable
         '''
         hdr = self._matrix_reader.read_header()
-        n = reduce(lambda x, y: x*y, hdr.dims, 1)  # fast product
-        remaining_bytes = hdr.dtype.itemsize * n
+        # Fast product for large (>2GB) arrays.
+        remaining_bytes = reduce(mul, hdr.dims, np.int64(hdr.dtype.itemsize))
         if hdr.is_complex and not hdr.mclass == mxSPARSE_CLASS:
             remaining_bytes *= 2
         next_position = self.mat_stream.tell() + remaining_bytes

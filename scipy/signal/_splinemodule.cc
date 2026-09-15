@@ -22,7 +22,8 @@ static void convert_strides(npy_intp *instrides, npy_intp *convstrides, int size
 }
 
 
-static char doc_FIRsepsym2d[] = "out = sepfir2d(input, hrow, hcol)\n"
+static char doc_FIRsepsym2d[] = "sepfir2d(input, hrow, hcol)\n"
+"--\n"  // needed to populate `__text_signature__`
 "\n"
 "    Convolve with a 2-D separable FIR filter.\n"
 "\n"
@@ -37,10 +38,10 @@ static char doc_FIRsepsym2d[] = "out = sepfir2d(input, hrow, hcol)\n"
 "        The input signal. Must be a rank-2 array.\n"
 "    hrow : ndarray\n"
 "        A rank-1 array defining the row direction of the filter.\n"
-"        Must be odd-length\n"
+"        Must be odd-length, and no longer than ``input.shape[1] + 1``.\n"
 "    hcol : ndarray\n"
 "        A rank-1 array defining the column direction of the filter.\n"
-"        Must be odd-length\n"
+"        Must be odd-length, and no longer than ``input.shape[0] + 1``.\n"
 "\n"
 "    Returns\n"
 "    -------\n"
@@ -88,6 +89,18 @@ static PyObject *FIRsepsym2d(PyObject *NPY_UNUSED(dummy), PyObject *args) {
 
   if (PyArray_DIMS(a_hrow)[0] % 2 != 1 || PyArray_DIMS(a_hcol)[0] % 2 != 1) {
     PYERR("hrow and hcol must be odd length");
+  }
+
+  /* _fir_mirror_symmetric reflects an out-of-range index only once, so it needs
+   * at least 2*(Nh/2) samples along the axis it filters. Shorter axes make it
+   * read, and for Nh/2 > N also write, outside the arrays. Lifting the
+   * restriction would require repeated reflection in the boundary sections.
+   */
+  if (N < 2 * (PyArray_DIMS(a_hrow)[0] >> 1)) {
+    PYERR("hrow must not be longer than input.shape[1] + 1");
+  }
+  if (M < 2 * (PyArray_DIMS(a_hcol)[0] >> 1)) {
+    PYERR("hcol must not be longer than input.shape[0] + 1");
   }
 
   switch (thetype) {
@@ -506,24 +519,47 @@ static struct PyMethodDef toolbox_module_methods[] = {
     {"sepfir2d", FIRsepsym2d, METH_VARARGS, doc_FIRsepsym2d},
     {"symiirorder1_ic", IIRsymorder1_ic, METH_VARARGS, doc_IIRsymorder1_ic},
     {"symiirorder2_ic_fwd", IIRsymorder2_ic_fwd, METH_VARARGS, doc_IIRsymorder2_ic_fwd},
-    {"symiirorder2_ic_bwd", IIRsymorder2_ic_bwd, METH_VARARGS,doc_IIRsymorder2_ic_bwd },
+    {"symiirorder2_ic_bwd", IIRsymorder2_ic_bwd, METH_VARARGS, doc_IIRsymorder2_ic_bwd},
     {NULL, NULL, 0, NULL}       /* sentinel */
 };
 
-/* Initialization function for the module */
-static struct PyModuleDef moduledef = {
-    PyModuleDef_HEAD_INIT,
-    "_spline",
-    NULL,
-    -1,
-    toolbox_module_methods,
-    NULL,
-    NULL,
-    NULL,
-    NULL
+
+static int module_exec(PyObject *module) {
+    (void)module;  /* unused */
+
+    if (_import_array() < 0) { return -1; }
+
+    return 0;
+}
+
+
+static struct PyModuleDef_Slot spline_slots[] = {
+    {Py_mod_exec, (void *)module_exec},
+    {Py_mod_multiple_interpreters, Py_MOD_PER_INTERPRETER_GIL_SUPPORTED},
+#if PY_VERSION_HEX >= 0x030d00f0  /* Python 3.13+ */
+    /* signal that this module supports running without an active GIL */
+    {Py_mod_gil, Py_MOD_GIL_NOT_USED},
+#endif
+    {0, NULL},
 };
 
-PyMODINIT_FUNC PyInit__spline(void) {
-    import_array();
-    return PyModule_Create(&moduledef);
+
+/* Initialization function for the module */
+static struct PyModuleDef moduledef = {
+    /* m_base     */ PyModuleDef_HEAD_INIT,
+    /* m_name     */ "_spline",
+    /* m_doc      */ NULL,
+    /* m_size     */ 0,
+    /* m_methods  */ toolbox_module_methods,
+    /* m_slots    */ spline_slots,
+    /* m_traverse */ NULL,
+    /* m_clear    */ NULL,
+    /* m_free     */ NULL
+};
+
+
+PyMODINIT_FUNC
+PyInit__spline(void)
+{
+    return PyModuleDef_Init(&moduledef);
 }

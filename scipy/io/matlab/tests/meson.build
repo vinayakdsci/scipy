@@ -64,6 +64,7 @@ py3.install_sources([
     'data/testemptycell_7.4_GLNX86.mat',
     'data/testfunc_7.4_GLNX86.mat',
     'data/testhdf5_7.4_GLNX86.mat',
+    'data/testmatlabstring_7_WIN64.mat',
     'data/testmatrix_4.2c_SOL2.mat',
     'data/testmatrix_6.1_SOL2.mat',
     'data/testmatrix_6.5.1_GLNX86.mat',
@@ -123,7 +124,8 @@ py3.install_sources([
     'data/teststructnest_7.4_GLNX86.mat',
     'data/testunicode_7.1_GLNX86.mat',
     'data/testunicode_7.4_GLNX86.mat',
-    'data/testvec_4_GLNX86.mat'
+    'data/testvec_4_GLNX86.mat',
+    'data/debigged_m4.mat'
   ],
   subdir: 'scipy/io/matlab/tests/data',
   install_tag: 'tests'

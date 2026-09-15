@@ -3,8 +3,8 @@ import os
 from os.path import relpath, dirname
 import re
 import sys
+import importlib.machinery
 import warnings
-from datetime import date
 from docutils import nodes
 from docutils.parsers.rst import Directive
 
@@ -19,6 +19,7 @@ from scipy._lib._util import _rng_html_rewrite
 # Workaround for sphinx-doc/sphinx#6573
 # ua._Function should not be treated as an attribute
 import scipy._lib.uarray as ua
+from scipy.special._ufunc_tools import _UFuncWrapper
 from scipy.stats._distn_infrastructure import rv_generic
 from scipy.stats._multivariate import multi_rv_generic
 
@@ -26,9 +27,6 @@ from scipy.stats._multivariate import multi_rv_generic
 old_isdesc = inspect.isdescriptor
 inspect.isdescriptor = (lambda obj: old_isdesc(obj)
                         and not isinstance(obj, ua._Function))
-
-# Currently required to build scipy.fft docs
-os.environ['_SCIPY_BUILDING_DOC'] = 'True'
 
 # -----------------------------------------------------------------------------
 # General configuration
@@ -48,12 +46,14 @@ extensions = [
     'sphinx.ext.mathjax',
     'sphinx.ext.intersphinx',
     'numpydoc',
+    'sphinx_copybutton',
     'sphinx_design',
     'scipyoptdoc',
     'doi_role',
     'matplotlib.sphinxext.plot_directive',
     'myst_nb',
     'jupyterlite_sphinx',
+    'array_api_capabilities_table',
 ]
 
 
@@ -66,14 +66,14 @@ plt.ioff()
 templates_path = ['_templates']
 
 # The suffix of source filenames.
-source_suffix = '.rst'
+source_suffix = {'.rst': 'restructuredtext'}
 
 # The main toctree document.
 master_doc = 'index'
 
 # General substitutions.
 project = 'SciPy'
-copyright = f'2008-{date.today().year}, The SciPy community'
+copyright = '2008, The SciPy community'
 
 # The default replacements for |version| and |release|, also used in various
 # other places throughout the built documents.
@@ -123,7 +123,7 @@ add_function_parentheses = False
 # Ensure all our internal links work
 nitpicky = True
 nitpick_ignore = [
-    # This ignores errors for classes (OptimizeResults, sparse.dok_matrix)
+    # This ignores errors for classes (OptimizeResults, sparse.dok_array)
     # which inherit methods from `dict`. missing references to builtins get
     # ignored by default (see https://github.com/sphinx-doc/sphinx/pull/7254),
     # but that fix doesn't work for inherited methods.
@@ -134,6 +134,7 @@ nitpick_ignore = [
     ("py:class", "None.  Remove all items from D."),
     ("py:class", "(k, v), remove and return some (key, value) pair as a"),
     ("py:class", "None.  Update D from dict/iterable E and F."),
+    ("py:class", "None.  Update D from mapping/iterable E and F."),
     ("py:class", "v, remove specified key and return the corresponding value."),
 ]
 
@@ -144,12 +145,6 @@ warnings.filterwarnings('error')
 # allow these and show them
 warnings.filterwarnings('default', module='sphinx')  # internal warnings
 # global weird ones that can be safely ignored
-for key in (
-        r"OpenSSL\.rand is deprecated",  # OpenSSL package in linkcheck
-        r"distutils Version",  # distutils
-        ):
-    warnings.filterwarnings(  # deal with other modules having bad imports
-        'ignore', message=".*" + key, category=DeprecationWarning)
 warnings.filterwarnings(  # matplotlib<->pyparsing issue
     'ignore', message="Exception creating Regex for oneOf.*",
     category=SyntaxWarning)
@@ -185,6 +180,23 @@ warnings.filterwarnings(
     category=DeprecationWarning,
 )
 
+# see: https://github.com/scipy/scipy/issues/22020
+warnings.filterwarnings(
+    'ignore',
+    message=r'.*py:obj reference target not found: scipy.misc.*',
+    category=Warning,
+)
+warnings.filterwarnings(
+    'ignore',
+    message=r'.*`scipy.stats.mstats` is deprecated.*',
+    category=DeprecationWarning,
+)
+
+# See https://github.com/sphinx-doc/sphinx/issues/12589
+suppress_warnings = [
+    'autosummary.import_cycle',
+]
+
 # -----------------------------------------------------------------------------
 # HTML output
 # -----------------------------------------------------------------------------
@@ -195,15 +207,25 @@ html_logo = '_static/logo.svg'
 html_favicon = '_static/favicon.ico'
 
 html_sidebars = {
-    "index": "search-button-field",
+    "index": ["search-button-field"],
     "**": ["search-button-field", "sidebar-nav-bs"]
 }
-
+html_js_files = [('custom-icons.js', {"defer": "defer"}),]  # for custom header icon(s)
 html_theme_options = {
-    "github_url": "https://github.com/scipy/scipy",
-    "twitter_url": "https://twitter.com/SciPy_team",
     "header_links_before_dropdown": 6,
-    "icon_links": [],
+    "icon_links": [
+      {
+        "name": "GitHub",
+        "url": "https://github.com/scipy/scipy",
+        "icon": "fa-brands fa-github",
+      },
+      {
+        "name": "Scientific Python Forum",
+        "url": "https://discuss.scientific-python.org/c/contributor/scipy/",
+        "icon": "fa-custom fa-SciPy_Forum", # defined in file `_static/custom-icons.js`
+        "type": "fontawesome",
+      },
+    ],
     "logo": {
         "text": "SciPy",
     },
@@ -230,25 +252,12 @@ if 'dev' in version:
     html_theme_options["switcher"]["version_match"] = "development"
     html_theme_options["show_version_warning_banner"] = False
 
-if 'versionwarning' in tags:  # noqa: F821
-    # Specific to docs.scipy.org deployment.
-    # See https://github.com/scipy/docs.scipy.org/blob/main/_static/versionwarning.js_t
-    src = ('var script = document.createElement("script");\n'
-           'script.type = "text/javascript";\n'
-           'script.src = "/doc/_static/versionwarning.js";\n'
-           'document.head.appendChild(script);')
-    html_context = {
-        'VERSIONCHECK_JS': src
-    }
-    html_js_files = ['versioncheck.js']
-
 html_title = f"{project} v{version} Manual"
 html_static_path = ['_static']
 html_last_updated_fmt = '%b %d, %Y'
 
 html_css_files = [
     "scipy.css",
-    "try_examples.css",
 ]
 
 # html_additional_pages = {
@@ -263,6 +272,10 @@ html_file_suffix = '.html'
 htmlhelp_basename = 'scipy'
 
 mathjax_path = "scipy-mathjax/MathJax.js?config=scipy-mathjax"
+
+# sphinx-copybutton configurations
+copybutton_prompt_text = r">>> |\.\.\. |\$ |In \[\d*\]: | {2,5}\.{3,}: | {5,8}: "
+copybutton_prompt_is_regexp = True
 
 # -----------------------------------------------------------------------------
 # Intersphinx configuration
@@ -281,7 +294,8 @@ phantom_import_file = 'dump.xml'
 # Generate plots for example sections
 numpydoc_use_plots = True
 np_docscrape.ClassDoc.extra_public_methods = [  # should match class.rst
-    '__call__', '__mul__', '__getitem__', '__len__',
+    '__call__', '__mul__', '__getitem__', '__len__', '__pow__', '__matmul__',
+    '__truediv__', '__add__', '__rmul__', '__rmatmul__'
 ]
 
 # -----------------------------------------------------------------------------
@@ -291,14 +305,15 @@ np_docscrape.ClassDoc.extra_public_methods = [  # should match class.rst
 autosummary_generate = True
 
 # maps functions with a name same as a class name that is indistinguishable
-# Ex: scipy.signal.czt and scipy.signal.CZT or scipy.odr.odr and scipy.odr.ODR
+# Ex: scipy.signal.czt and scipy.signal.CZT
 # Otherwise, the stubs are overwritten when the name is same for
 # OS (like MacOS) which has a filesystem that ignores the case
 # See https://github.com/sphinx-doc/sphinx/pull/7927
 autosummary_filename_map = {
-    "scipy.odr.odr": "odr-function",
     "scipy.signal.czt": "czt-function",
     "scipy.signal.ShortTimeFFT.t": "scipy.signal.ShortTimeFFT.t.lower",
+    "scipy.stats.logistic": "scipy.stats.logistic.lower",
+    "scipy.stats.uniform": "scipy.stats.uniform.lower",
 }
 
 
@@ -336,9 +351,14 @@ coverage_ignore_c_items = {}
 plot_pre_code = """
 import warnings
 for key in (
-        'interp2d` is deprecated',  # Deprecation of scipy.interpolate.interp2d
-        'scipy.misc',  # scipy.misc deprecated in v1.10.0; use scipy.datasets
         '`kurtosistest` p-value may be',  # intentionally "bad" example in docstring
+        'pade',
+        'lagrange',
+        'approximate_taylor_polynomial',
+        'tsearch',
+        'minkowski_distance_p',
+        'minkowski_distance',
+        'distance_matrix'
         ):
     warnings.filterwarnings(action='ignore', message='.*' + key + '.*')
 
@@ -372,10 +392,11 @@ plot_rcparams = {
 }
 
 # -----------------------------------------------------------------------------
-# Notebook tutorials with MyST-NB
+# Notebook tutorials with MyST-NB and JupyterLite
 # -----------------------------------------------------------------------------
 
-nb_execution_mode = "auto"
+# 1. MyST-NB configuration
+nb_execution_mode = "cache"
 # Ignore notebooks generated by jupyterlite-sphinx for interactive examples.
 nb_execution_excludepatterns = ["_contents/*.ipynb"]
 # Prevent creation of transition syntax when adding footnotes
@@ -385,11 +406,21 @@ myst_enable_extensions = [
     "colon_fence",
     "dollarmath",
     "substitution",
+    "linkify",
 ]
 nb_render_markdown_format = "myst"
 render_markdown_format = "myst"
 # Fix rendering of MathJax objects in Jupyter notebooks
 myst_update_mathjax = False
+
+# 2. jupyterlite-sphinx configuration
+
+# Strip out cells tagged with "jupyterlite_sphinx_strip" from the
+# interactive renditions of the notebooks
+strip_tagged_cells = True
+
+# Enable overrides for JupyterLite settings at runtime
+jupyterlite_overrides = "overrides.json"
 
 #------------------------------------------------------------------------------
 # Interactive examples with jupyterlite-sphinx
@@ -449,8 +480,11 @@ def linkcode_resolve(domain, info):
         obj = obj.__wrapped__
     # SciPy's distributions are instances of *_gen. Point to this
     # class since it contains the implementation of all the methods.
-    if isinstance(obj, (rv_generic, multi_rv_generic)):
+    if isinstance(obj, rv_generic | multi_rv_generic):
         obj = obj.__class__
+    # Much like ufuncs, ufunc_wrappers have no source location.
+    if isinstance(obj, _UFuncWrapper):
+        return None
     try:
         fn = inspect.getsourcefile(obj)
     except Exception:
@@ -469,7 +503,7 @@ def linkcode_resolve(domain, info):
         lineno = None
 
     if lineno:
-        linespec = "#L%d-L%d" % (lineno, lineno + len(source) - 1)
+        linespec = f"#L{lineno}-L{lineno + len(source) - 1}"
     else:
         linespec = ""
 
@@ -514,8 +548,9 @@ class LegacyDirective(Directive):
             # Argument is empty; use default text
             obj = "submodule"
         text = (f"This {obj} is considered legacy and will no longer receive "
-                "updates. This could also mean it will be removed in future "
-                "SciPy versions.")
+                "updates. While we currently have no plans to remove it, "
+                "we recommend that new code uses more modern alternatives instead."
+        )
 
         try:
             self.content[0] = text+" "+self.content[0]
@@ -546,5 +581,48 @@ class LegacyDirective(Directive):
         return [admonition_node]
 
 
+_EXT_SUFFIXES = tuple(importlib.machinery.EXTENSION_SUFFIXES)
+
+
+def _extension_origin(mod):
+    origin = getattr(getattr(mod, "__spec__", None), "origin", "") or ""
+    return origin if origin.endswith(_EXT_SUFFIXES) else ""
+
+
+def _note_extension_dependency(app, what, name, obj, options, lines):
+    """Rebuild pages when the extension module holding the docstring changes.
+
+    Sphinx records the Python source of the module an object is documented from,
+    and only falls back to the compiled module when that has no source at all. So
+    for anything re-exported into a pure-Python package -- ``scipy.special``
+    re-exporting ``loggamma`` from ``_special_ufuncs*.so``, say -- it records
+    ``scipy/special/__init__.py``, and rebuilding the extension never invalidates
+    the page. See gh-23440.
+    """
+    # an object that knows its own module is authoritative; scanning past it
+    # matches any extension that merely imports the object (gh-23440 review).
+    # This branch is redundant once sphinx-doc/sphinx#14594 is our minimum; the
+    # fallback below is not, as Sphinx cannot attribute a __module__-less object.
+    if modname := getattr(obj, "__module__", None):
+        if origin := _extension_origin(sys.modules.get(modname)):
+            app.env.note_dependency(origin)
+        return
+    # ufuncs carry no __module__, so fall back to locating the providing submodule
+    parent, _, attr = name.rpartition(".")
+    if not parent:
+        return
+    # an alias is exposed under a name the submodule does not know it by (digamma/psi)
+    attrs = {attr, getattr(obj, "__name__", "")} - {""}
+    prefix = parent + "."
+    for sub_name, sub in list(sys.modules.items()):
+        if sub_name.startswith(prefix) and any(
+            getattr(sub, a, None) is obj for a in attrs
+        ):
+            if origin := _extension_origin(sub):
+                app.env.note_dependency(origin)
+                return
+
+
 def setup(app):
     app.add_directive("legacy", LegacyDirective)
+    app.connect("autodoc-process-docstring", _note_extension_dependency)

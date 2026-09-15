@@ -348,7 +348,7 @@ static void data_capsule_destructor(PyObject *capsule)
 {
     void *data;
     data = PyCapsule_GetPointer(capsule, NULL);
-    free(data);
+    PyMem_RawFree(data);
 }
 
 static PyObject *test_get_data_capsule(PyObject *obj, PyObject *args)
@@ -359,7 +359,7 @@ static PyObject *test_get_data_capsule(PyObject *obj, PyObject *args)
         return NULL;
     }
 
-    data = (double *)malloc(sizeof(double));
+    data = (double *)PyMem_RawMalloc(sizeof(double));
     if (data == NULL) {
         return PyErr_NoMemory();
     }
@@ -387,21 +387,28 @@ static PyMethodDef test_ccallback_methods[] = {
 };
 
 
+static struct PyModuleDef_Slot test_ccallback_slots[] = {
+    // signal that this module can be imported in isolated subinterpreters
+    {Py_mod_multiple_interpreters, Py_MOD_PER_INTERPRETER_GIL_SUPPORTED},
+#if PY_VERSION_HEX >= 0x030d00f0  // Python 3.13+
+    // signal that this module supports running without an active GIL
+    {Py_mod_gil, Py_MOD_GIL_NOT_USED},
+#endif
+    {0, NULL},
+};
+
+
 static struct PyModuleDef test_ccallback_module = {
-    PyModuleDef_HEAD_INIT,
-    "_test_ccallback",
-    NULL,
-    -1,
-    test_ccallback_methods,
-    NULL,
-    NULL,
-    NULL,
-    NULL
+    .m_base = PyModuleDef_HEAD_INIT,
+    .m_name = "_test_ccallback",
+    .m_size = 0,
+    .m_methods = test_ccallback_methods,
+    .m_slots = test_ccallback_slots,
 };
 
 
 PyMODINIT_FUNC
 PyInit__test_ccallback(void)
 {
-    return PyModule_Create(&test_ccallback_module);
+    return PyModuleDef_Init(&test_ccallback_module);
 }

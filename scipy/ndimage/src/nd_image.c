@@ -828,10 +828,10 @@ static PyObject *Py_FindObjects(PyObject *obj, PyObject *args)
         max_label = 0;
     if (max_label > 0) {
         if (PyArray_NDIM(input) > 0) {
-            regions = (npy_intp*)malloc(2 * max_label * PyArray_NDIM(input) *
+            regions = (npy_intp*)PyMem_RawMalloc(2 * max_label * PyArray_NDIM(input) *
                                         sizeof(npy_intp));
         } else {
-            regions = (npy_intp*)malloc(max_label * sizeof(npy_intp));
+            regions = (npy_intp*)PyMem_RawMalloc(max_label * sizeof(npy_intp));
         }
         if (!regions) {
             PyErr_NoMemory();
@@ -893,7 +893,7 @@ static PyObject *Py_FindObjects(PyObject *obj, PyObject *args)
     Py_XDECREF(start);
     Py_XDECREF(end);
     Py_XDECREF(slc);
-    free(regions);
+    PyMem_RawFree(regions);
     if (PyErr_Occurred()) {
         return NULL;
     } else {
@@ -928,7 +928,7 @@ static PyObject *Py_FindObjects(PyObject *obj, PyObject *args)
 }
 #define CASE_VALUEINDICES_MAKEHISTOGRAM(valType) {\
     numPossibleVals = (VALUEINDICES_MAXVAL(valType) - VALUEINDICES_MINVAL(valType) + 1); \
-    hist = (npy_intp *)calloc(numPossibleVals, sizeof(npy_intp)); \
+    hist = (npy_intp *)PyMem_RawCalloc(numPossibleVals, sizeof(npy_intp)); \
     if (hist != NULL) { \
         NI_InitPointIterator(arr, &ndiIter); \
         arrData = (char *)PyArray_DATA(arr); \
@@ -1032,8 +1032,8 @@ static PyObject *NI_ValueIndices(PyObject *self, PyObject *args)
     if (hist != NULL) {
         /* Allocate local data structures to track where we are up to while
            assigning index values */
-        valCtr = (npy_intp *)calloc(numPossibleVals, sizeof(npy_intp));
-        ndxPtr = (PyObject **)calloc(numPossibleVals, sizeof(PyObject  *));
+        valCtr = (npy_intp *)PyMem_RawCalloc(numPossibleVals, sizeof(npy_intp));
+        ndxPtr = (PyObject **)PyMem_RawCalloc(numPossibleVals, sizeof(PyObject  *));
         if (valCtr == NULL)
             PyErr_SetString(PyExc_MemoryError, "Couldn't allocate valCtr");
         else if (ndxPtr == NULL)
@@ -1131,9 +1131,9 @@ static PyObject *NI_ValueIndices(PyObject *self, PyObject *args)
     }
 
     /* Clean up everything */
-    if (hist != NULL) free(hist);
-    if (valCtr != NULL) free(valCtr);
-    if (ndxPtr != NULL) free(ndxPtr);
+    if (hist != NULL) PyMem_RawFree(hist);
+    if (valCtr != NULL) PyMem_RawFree(valCtr);
+    if (ndxPtr != NULL) PyMem_RawFree(ndxPtr);
     Py_DECREF(minMaxArr);
 
     if (PyErr_Occurred()) {
@@ -1201,6 +1201,8 @@ static PyObject *Py_DistanceTransformOnePass(PyObject *obj, PyObject *args)
         goto exit;
 
     NI_DistanceTransformOnePass(strct, distances, features);
+    PyArray_ResolveWritebackIfCopy(distances);
+    PyArray_ResolveWritebackIfCopy(features);
 
 exit:
     Py_XDECREF(strct);
@@ -1221,6 +1223,7 @@ static PyObject *Py_EuclideanFeatureTransform(PyObject *obj,
         goto exit;
 
     NI_EuclideanFeatureTransform(input, sampling, features);
+    PyArray_ResolveWritebackIfCopy(features);
 
 exit:
     Py_XDECREF(input);
@@ -1314,6 +1317,7 @@ static PyObject *Py_BinaryErosion2(PyObject *obj, PyObject *args)
     else {
         PyErr_SetString(PyExc_RuntimeError, "cannot convert CObject");
     }
+    PyArray_ResolveWritebackIfCopy(array);
 exit:
     Py_XDECREF(array);
     Py_XDECREF(strct);
@@ -1323,67 +1327,63 @@ exit:
 }
 
 static PyMethodDef methods[] = {
-    {"correlate1d",           (PyCFunction)Py_Correlate1D,
-     METH_VARARGS, NULL},
-    {"correlate",             (PyCFunction)Py_Correlate,
-     METH_VARARGS, NULL},
-    {"uniform_filter1d",      (PyCFunction)Py_UniformFilter1D,
-     METH_VARARGS, NULL},
-    {"min_or_max_filter1d",   (PyCFunction)Py_MinOrMaxFilter1D,
-        METH_VARARGS, NULL},
-    {"min_or_max_filter",     (PyCFunction)Py_MinOrMaxFilter,
-        METH_VARARGS, NULL},
-    {"rank_filter",           (PyCFunction)Py_RankFilter,
-     METH_VARARGS, NULL},
-    {"generic_filter",        (PyCFunction)Py_GenericFilter,
-     METH_VARARGS, NULL},
-    {"generic_filter1d",      (PyCFunction)Py_GenericFilter1D,
-     METH_VARARGS, NULL},
-    {"fourier_filter",        (PyCFunction)Py_FourierFilter,
-     METH_VARARGS, NULL},
-    {"fourier_shift",         (PyCFunction)Py_FourierShift,
-     METH_VARARGS, NULL},
-    {"spline_filter1d",       (PyCFunction)Py_SplineFilter1D,
-     METH_VARARGS, NULL},
-    {"geometric_transform",   (PyCFunction)Py_GeometricTransform,
-        METH_VARARGS, NULL},
-    {"zoom_shift",            (PyCFunction)Py_ZoomShift,
-     METH_VARARGS, NULL},
-    {"find_objects",          (PyCFunction)Py_FindObjects,
-     METH_VARARGS, NULL},
-    {"value_indices",         (PyCFunction)NI_ValueIndices,
-     METH_VARARGS, NULL},
-    {"watershed_ift",         (PyCFunction)Py_WatershedIFT,
-     METH_VARARGS, NULL},
-    {"distance_transform_bf", (PyCFunction)Py_DistanceTransformBruteForce,
-     METH_VARARGS, NULL},
-    {"distance_transform_op", (PyCFunction)Py_DistanceTransformOnePass,
-     METH_VARARGS, NULL},
-    {"euclidean_feature_transform",
-     (PyCFunction)Py_EuclideanFeatureTransform,
-     METH_VARARGS, NULL},
-    {"binary_erosion",        (PyCFunction)Py_BinaryErosion,
-     METH_VARARGS, NULL},
-    {"binary_erosion2",       (PyCFunction)Py_BinaryErosion2,
-     METH_VARARGS, NULL},
-    {NULL, NULL, 0, NULL}
+    {"correlate1d",                 (PyCFunction)Py_Correlate1D,                 METH_VARARGS, NULL},
+    {"correlate",                   (PyCFunction)Py_Correlate,                   METH_VARARGS, NULL},
+    {"uniform_filter1d",            (PyCFunction)Py_UniformFilter1D,             METH_VARARGS, NULL},
+    {"min_or_max_filter1d",         (PyCFunction)Py_MinOrMaxFilter1D,            METH_VARARGS, NULL},
+    {"min_or_max_filter",           (PyCFunction)Py_MinOrMaxFilter,              METH_VARARGS, NULL},
+    {"rank_filter",                 (PyCFunction)Py_RankFilter,                  METH_VARARGS, NULL},
+    {"generic_filter",              (PyCFunction)Py_GenericFilter,               METH_VARARGS, NULL},
+    {"generic_filter1d",            (PyCFunction)Py_GenericFilter1D,             METH_VARARGS, NULL},
+    {"fourier_filter",              (PyCFunction)Py_FourierFilter,               METH_VARARGS, NULL},
+    {"fourier_shift",               (PyCFunction)Py_FourierShift,                METH_VARARGS, NULL},
+    {"spline_filter1d",             (PyCFunction)Py_SplineFilter1D,              METH_VARARGS, NULL},
+    {"geometric_transform",         (PyCFunction)Py_GeometricTransform,          METH_VARARGS, NULL},
+    {"zoom_shift",                  (PyCFunction)Py_ZoomShift,                   METH_VARARGS, NULL},
+    {"find_objects",                (PyCFunction)Py_FindObjects,                 METH_VARARGS, NULL},
+    {"value_indices",               (PyCFunction)NI_ValueIndices,                METH_VARARGS, NULL},
+    {"watershed_ift",               (PyCFunction)Py_WatershedIFT,                METH_VARARGS, NULL},
+    {"distance_transform_bf",       (PyCFunction)Py_DistanceTransformBruteForce, METH_VARARGS, NULL},
+    {"distance_transform_op",       (PyCFunction)Py_DistanceTransformOnePass,    METH_VARARGS, NULL},
+    {"euclidean_feature_transform", (PyCFunction)Py_EuclideanFeatureTransform,   METH_VARARGS, NULL},
+    {"binary_erosion",              (PyCFunction)Py_BinaryErosion,               METH_VARARGS, NULL},
+    {"binary_erosion2",             (PyCFunction)Py_BinaryErosion2,              METH_VARARGS, NULL},
+    {NULL,                          NULL,                                        0,            NULL}
 };
 
-static struct PyModuleDef moduledef = {
-    PyModuleDef_HEAD_INIT,
-    "_nd_image",
-    NULL,
-    -1,
-    methods,
-    NULL,
-    NULL,
-    NULL,
-    NULL
+
+static int
+_nd_image_module_exec(PyObject *module)
+{
+    (void)module;  /* unused */
+
+    if (_import_array() < 0) { return -1; }
+
+    return 0;
+}
+
+
+static struct PyModuleDef_Slot _nd_image_slots[] = {
+    {Py_mod_exec, _nd_image_module_exec},
+    {Py_mod_multiple_interpreters, Py_MOD_PER_INTERPRETER_GIL_SUPPORTED},
+#if PY_VERSION_HEX >= 0x030d00f0  /* Python 3.13+ */
+    {Py_mod_gil, Py_MOD_GIL_NOT_USED},
+#endif
+    {0, NULL},
 };
+
+
+static struct PyModuleDef moduledef = {
+    .m_base = PyModuleDef_HEAD_INIT,
+    .m_name = "_nd_image",
+    .m_size = 0,
+    .m_methods = methods,
+    .m_slots = _nd_image_slots,
+};
+
 
 PyMODINIT_FUNC
 PyInit__nd_image(void)
 {
-    import_array();
-    return PyModule_Create(&moduledef);
+    return PyModuleDef_Init(&moduledef);
 }

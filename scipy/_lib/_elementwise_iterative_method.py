@@ -9,12 +9,14 @@
 # `scipy.optimize._differentiate._differentiate for numerical differentiation,
 # `scipy.optimize._bracket._bracket_root for finding rootfinding brackets,
 # `scipy.optimize._bracket._bracket_minimize for finding minimization brackets,
-# `scipy.integrate._tanhsinh._tanhsinh` for numerical quadrature.
+# `scipy.integrate._tanhsinh._tanhsinh` for numerical quadrature,
+# `scipy.differentiate.derivative` for finite difference based differentiation.
 
 import math
 import numpy as np
 from ._util import _RichResult, _call_callback_maybe_halt
-from ._array_api import array_namespace, size as xp_size
+from ._array_api import array_namespace, xp_size, xp_result_type, xp_device
+import scipy._external.array_api_extra as xpx
 
 _ESIGNERR = -1
 _ECONVERR = -2
@@ -24,7 +26,8 @@ _EINPUTERR = -5
 _ECONVERGED = 0
 _EINPROGRESS = 1
 
-def _initialize(func, xs, args, complex_ok=False, preserve_shape=None):
+def _initialize(func, xs, args, kwargs=None, complex_ok=False, multi_output_ok=False,
+                preserve_shape=False, xp=None):
     """Initialize abscissa, function, and args arrays for elementwise function
 
     Parameters
@@ -41,12 +44,22 @@ def _initialize(func, xs, args, complex_ok=False, preserve_shape=None):
         Finite real abscissa arrays. Must be broadcastable.
     args : tuple, optional
         Additional positional arguments to be passed to `func`.
-    preserve_shape : bool, default:False
+    kwargs : tuple, optional
+        Additional keyword arguments to be passed to `func`.
+    complex_ok : bool, default: False
+        Whether complex dtypes are allowed; e.g., True for `tanhsinh`, False for
+        `_chandrupatla`.
+    multi_output_ok : bool, default: False
+        Whether the user callable may return multiple outputs as a single
+        array with shape to which `xs` and `args` are broadcastable to.
+    preserve_shape : bool, default: False
         When ``preserve_shape=False`` (default), `func` may be passed
         arguments of any shape; `_scalar_optimization_loop` is permitted
         to reshape and compress arguments at will. When
-        ``preserve_shape=False``, arguments passed to `func` must have shape
-        `shape` or ``shape + (n,)``, where ``n`` is any integer.
+        ``preserve_shape=True``, arguments passed to `func` must have shape
+        ``shape + (n,)``, where ``n`` is any integer.
+    xp : namespace
+        Namespace of array arguments in `xs`.
 
     Returns
     -------
@@ -72,38 +85,75 @@ def _initialize(func, xs, args, complex_ok=False, preserve_shape=None):
     `scipy.optimize._chandrupatla`.
     """
     nx = len(xs)
-    xp = array_namespace(*xs)
+    xp = array_namespace(*xs) if xp is None else xp
+
+    if kwargs is not None:
+        args = (*args, *kwargs.values())
+        kwnames = tuple(kwargs.keys())
+        def func(x, *args, kwnames=kwnames, func=func, **kwargs):
+            nargs = len(args) - len(kwnames)
+            kwarrays = dict(zip(kwnames, args[nargs:]))
+            return func(x, *args[:nargs], **kwarrays, **kwargs)
 
     # Try to preserve `dtype`, but we need to ensure that the arguments are at
     # least floats before passing them into the function; integers can overflow
     # and cause failure.
     # There might be benefit to combining the `xs` into a single array and
     # calling `func` once on the combined array. For now, keep them separate.
+    xat = xp_result_type(*xs, force_floating=True, xp=xp)
     xas = xp.broadcast_arrays(*xs, *args)  # broadcast and rename
-    xat = xp.result_type(*[xa.dtype for xa in xas])
-    xat = xp.asarray(1.).dtype if xp.isdtype(xat, "integral") else xat
     xs, args = xas[:nx], xas[nx:]
     xs = [xp.asarray(x, dtype=xat) for x in xs]  # use copy=False when implemented
-    fs = [xp.asarray(func(x, *args)) for x in xs]
+    device = xp_device(xs[0])
+    # When preserve_shape=True, the user needs to be able to easily predict the shape
+    # of the array passed to their callable. In particular, the arguments should always
+    # have the same number of dimensions. Calls to `func` in the loop will have an extra
+    # dimension, so we need to add an extra dimension in the call here, too.
+    if preserve_shape:
+        fs = [(xp.asarray(func(x[..., xp.newaxis],
+                               *(arg[..., xp.newaxis] for arg in args)),
+                          device=device))[..., 0]
+              for x in xs]
+    else:
+        fs = [xp.asarray(func(x, *args), device=device) for x in xs]
+    # We broadcasted the `xs` with all `args`, so the shapes are all the same.
     shape = xs[0].shape
+    # The output of `f` is always treated as a single array (although technically it
+    # is possible that the user callable returned a sequence of arrays that get stacked
+    # by `xp.asarray`). We assume that it is the same every time the function is called
+    # with arguments of a given shape.
     fshape = fs[0].shape
+
+    if ((not multi_output_ok or not preserve_shape)
+            and (not all(f.shape == shape for f in fs))):
+        message = ("The shape of the array returned by `func` must be the same as the "
+                   "broadcasted shape of `x` and all other `args` and `kwargs`, "
+                   f"`{shape}`; however, `func` returned an array of shape `{fshape}`.")
+        raise ValueError(message)
 
     if preserve_shape:
         # bind original shape/func now to avoid late-binding gotcha
         def func(x, *args, shape=shape, func=func,  **kwargs):
             i = (0,)*(len(fshape) - len(shape))
-            return func(x[i], *args, **kwargs)
-        shape = np.broadcast_shapes(fshape, shape)  # just shapes; use of NumPy OK
+            return func(x[i], *(arg[i] for arg in args), **kwargs)
+
+    if preserve_shape and multi_output_ok:
+        try:
+            # just shapes; use of NumPy OK
+            shape = np.broadcast_shapes(fshape, shape)
+        except ValueError as e:
+            message = ("When `preserve_shape=True`, the array returned by `func` must "
+                       "be broadcastable with `x` and all other `args` and `kwargs` "
+                       f"with shape `{shape}`; however, `func` returned an array of "
+                       f"shape `{fshape}`.")
+            raise ValueError(message) from e
+
+        # We also (reasonably) assume that xs/args are broadcastable *to* the shape
+        # of the array returned by the function; i.e. it may have additional leading
+        # dimensions representing multiple outputs, but it may not be a reducing
+        # function of `x` or the `args`.
         xs = [xp.broadcast_to(x, shape) for x in xs]
         args = [xp.broadcast_to(arg, shape) for arg in args]
-
-    message = ("The shape of the array returned by `func` must be the same as "
-               "the broadcasted shape of `x` and all other `args`.")
-    if preserve_shape is not None:  # only in tanhsinh for now
-        message = f"When `preserve_shape=False`, {message.lower()}"
-    shapes_equal = [f.shape == shape for f in fs]
-    if not all(shapes_equal):  # use Python all to reduce overhead
-        raise ValueError(message)
 
     # These algorithms tend to mix the dtypes of the abscissae and function
     # values, so figure out what the result will be and convert them all to
@@ -131,7 +181,12 @@ def _loop(work, callback, shape, maxiter, func, args, dtype, pre_func_eval,
     ----------
     work : _RichResult
         All variables that need to be retained between iterations. Must
-        contain attributes `nit`, `nfev`, and `success`
+        contain attributes `nit`, `nfev`, `success`, and `status` (an array
+        on the device of the input arrays, which anchors the device of the
+        result and bookkeeping arrays). All arrays are
+        subject to being "compressed" if `preserve_shape is False`; nest
+        arrays that should not be compressed inside another object (e.g.
+        `dict` or `_RichResult`).
     callback : callable
         User-specified callback function
     shape : tuple of ints
@@ -172,7 +227,9 @@ def _loop(work, callback, shape, maxiter, func, args, dtype, pre_func_eval,
         copied to the appropriate indices of `res` when appropriate. The order
         determines the order in which _RichResult attributes will be
         pretty-printed.
-
+    preserve_shape : bool, default: False
+        Whether to compress the attributes of `work` (to avoid unnecessary
+        computation on elements that have already converged).
     Returns
     -------
     res : _RichResult
@@ -195,13 +252,16 @@ def _loop(work, callback, shape, maxiter, func, args, dtype, pre_func_eval,
     cb_terminate = False
 
     # Initialize the result object and active element index array
+    device = xp_device(work.status)
     n_elements = math.prod(shape)
-    active = xp.arange(n_elements)  # in-progress element indices
-    res_dict = {i: xp.zeros(n_elements, dtype=dtype) for i, j in res_work_pairs}
-    res_dict['success'] = xp.zeros(n_elements, dtype=xp.bool)
-    res_dict['status'] = xp.full(n_elements, _EINPROGRESS, dtype=xp.int32)
-    res_dict['nit'] = xp.zeros(n_elements, dtype=xp.int32)
-    res_dict['nfev'] = xp.zeros(n_elements, dtype=xp.int32)
+    active = xp.arange(n_elements, device=device)  # in-progress element indices
+    res_dict = {i: xp.zeros(n_elements, dtype=dtype, device=device)
+                for i, j in res_work_pairs}
+    res_dict['success'] = xp.zeros(n_elements, dtype=xp.bool, device=device)
+    res_dict['status'] = xp.full(n_elements, _EINPROGRESS, dtype=xp.int32,
+                                 device=device)
+    res_dict['nit'] = xp.zeros(n_elements, dtype=xp.int32, device=device)
+    res_dict['nfev'] = xp.zeros(n_elements, dtype=xp.int32, device=device)
     res = _RichResult(res_dict)
     work.args = args
 
@@ -229,10 +289,12 @@ def _loop(work, callback, shape, maxiter, func, args, dtype, pre_func_eval,
             work.args = args
 
         x_shape = x.shape
+        args = work.args
         if preserve_shape:
             x = xp.reshape(x, (shape + (-1,)))
-        f = func(x, *work.args)
-        f = xp.asarray(f, dtype=dtype)
+            args = [xp.reshape(arg, (shape + (-1,))) for arg in work.args]
+        f = func(x, *args)
+        f = xp.asarray(f, dtype=dtype, device=device)
         if preserve_shape:
             x = xp.reshape(x, x_shape)
             f = xp.reshape(f, x_shape)
@@ -255,7 +317,7 @@ def _loop(work, callback, shape, maxiter, func, args, dtype, pre_func_eval,
 
         post_termination_check(work)
 
-    work.status[:] = _ECALLBACK if cb_terminate else _ECONVERR
+    work.status = xpx.at(work.status)[:].set(_ECALLBACK if cb_terminate else _ECONVERR)
     return _prepare_result(work, res, res_work_pairs, active, shape,
                            customize_result, preserve_shape, xp)
 
@@ -281,14 +343,10 @@ def _check_termination(work, res, res_work_pairs, active, check_termination,
         if not preserve_shape:
             # compress the arrays to avoid unnecessary computation
             for key, val in work.items():
-                # Need to find a better way than these try/excepts
-                # Somehow need to keep compressible numerical args separate
-                if key == 'args':
+                # `continued_fraction` hacks `n`; improve if this becomes a problem
+                if key in {'args', 'n'}:
                     continue
-                try:
-                    work[key] = val[proceed]
-                except (IndexError, TypeError, KeyError):  # not a compressible array
-                    work[key] = val
+                work[key] = val[proceed] if getattr(val, 'ndim', 0) > 0 else val
             work.args = [arg[proceed] for arg in work.args]
 
     return active
@@ -305,28 +363,21 @@ def _update_active(work, res, res_work_pairs, active, mask, preserve_shape, xp):
     if mask is not None:
         if preserve_shape:
             active_mask = xp.zeros_like(mask)
-            active_mask[active] = 1
+            active_mask = xpx.at(active_mask)[active].set(True)
             active_mask = active_mask & mask
             for key, val in update_dict.items():
-                try:
-                    res[key][active_mask] = val[active_mask]
-                except (IndexError, TypeError, KeyError):
-                    res[key][active_mask] = val
+                val = val[active_mask] if getattr(val, 'ndim', 0) > 0 else val
+                res[key] = xpx.at(res[key])[active_mask].set(val)
         else:
             active_mask = active[mask]
             for key, val in update_dict.items():
-                try:
-                    res[key][active_mask] = val[mask]
-                except (IndexError, TypeError, KeyError):
-                    res[key][active_mask] = val
+                val = val[mask] if getattr(val, 'ndim', 0) > 0 else val
+                res[key] = xpx.at(res[key])[active_mask].set(val)
     else:
         for key, val in update_dict.items():
-            if preserve_shape:
-                try:
-                    val = val[active]
-                except (IndexError, TypeError, KeyError):
-                    pass
-            res[key][active] = val
+            if preserve_shape and getattr(val, 'ndim', 0) > 0:
+                val = val[active]
+            res[key] = xpx.at(res[key])[active].set(val)
 
 
 def _prepare_result(work, res, res_work_pairs, active, shape, customize_result,

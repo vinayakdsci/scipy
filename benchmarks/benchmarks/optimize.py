@@ -14,9 +14,9 @@ from .lsq_problems import extract_lsq_problems
 
 with safe_import():
     import scipy.optimize
-    from scipy.optimize.optimize import rosen, rosen_der, rosen_hess
-    from scipy.optimize import (leastsq, basinhopping, differential_evolution,
-                                dual_annealing, shgo, direct)
+    from scipy.optimize import (rosen, rosen_der, rosen_hess, leastsq, basinhopping,
+                                differential_evolution, dual_annealing, shgo, direct,
+                                biteopt)
     from scipy.optimize._minimize import MINIMIZE_METHODS
     from .cutest.calfun import calfun
     from .cutest.dfoxs import dfoxs
@@ -89,15 +89,14 @@ class _BenchOptimizers(Benchmark):
         print("")
         print("=========================================================")
         print(f"Optimizer benchmark: {self.function_name}")
-        print("dimensions: %d, extra kwargs: %s" %
-              (results[0].ndim, str(self.minimizer_kwargs)))
-        print("averaged over %d starting configurations" % (results[0].ntrials))
+        print(f"dimensions: {results[0].ndim}, "
+              f"extra kwargs: {str(self.minimizer_kwargs)}")
+        print(f"averaged over {results[0].ntrials} starting configurations")
         print("  Optimizer    nfail   nfev    njev    nhev    time")
         print("---------------------------------------------------------")
         for res in results:
-            print("%11s  | %4d  | %4d  | %4d  | %4d  | %.6g" %
-                  (res.name, res.nfail, res.mean_nfev,
-                   res.mean_njev, res.mean_nhev, res.mean_time))
+            print(f"{res.name:11s}  | {res.nfail:4d}  | {res.mean_nfev:4d}  | "
+                  f"{res.mean_njev:4d}  | {res.mean_nhev:4d}  | {res.mean_time:.6g}")
 
     def average_results(self):
         """group the results by minimizer and average over the runs"""
@@ -241,21 +240,38 @@ class _BenchOptimizers(Benchmark):
         res.nfev = self.function.nfev
         self.add_result(res, t1 - t0, 'DA')
 
+    def run_biteopt(self):
+        """
+        Do an optimization run for biteopt
+        """
+        self.function.nfev = 0
+
+        t0 = time.time()
+
+        res = biteopt(self.fun,
+                      self.bounds)
+
+        t1 = time.time()
+        res.success = self.function.success(res.x)
+        res.nfev = self.function.nfev
+        self.add_result(res, t1 - t0, 'biteopt')
+
     def bench_run_global(self, numtrials=50, methods=None):
         """
         Run the optimization tests for the required minimizers.
         """
 
         if methods is None:
-            methods = ['DE', 'basinh.', 'DA', 'DIRECT', 'SHGO']
+            methods = ['DE', 'basinh.', 'DA', 'DIRECT', 'SHGO', 'biteopt']
 
-        stochastic_methods = ['DE', 'basinh.', 'DA']
+        stochastic_methods = ['DE', 'basinh.', 'DA', 'biteopt']
 
         method_fun = {'DE': self.run_differentialevolution,
                       'basinh.': self.run_basinhopping,
                       'DA': self.run_dualannealing,
                       'DIRECT': self.run_direct,
-                      'SHGO': self.run_shgo, }
+                      'SHGO': self.run_shgo,
+                      'biteopt': self.run_biteopt, }
 
         for m in methods:
             if m in stochastic_methods:
@@ -429,9 +445,10 @@ class BenchSmoothUnbounded(Benchmark):
         # scipy.optimize.check_grad(s.get_energy, s.get_gradient,
         #                           np.random.uniform(-2,2,3*4))
         natoms = 4
-        b = _BenchOptimizers("%d atom Lennard Jones potential" % (natoms),
-                             fun=s.fun, der=s.der, hess=None)
-        for i in range(10):
+        b = _BenchOptimizers(
+            f"{natoms} atom Lennard Jones potential", fun=s.fun, der=s.der, hess=None
+        )
+        for _ in range(10):
             b.bench_run(np.random.uniform(-2, 2, natoms*3), methods=methods)
         return b
 
@@ -479,6 +496,7 @@ class BenchLeastSquares(Benchmark):
 # `export SCIPY_GLOBAL_BENCH=AMGM,Adjiman,...` to run specific tests
 # `export SCIPY_GLOBAL_BENCH_NUMTRIALS=10` to specify n_iterations, default 100
 #
+# then run `spin bench -s optimize.BenchGlobal`
 # Note that it can take several hours to run; intermediate output
 # can be found under benchmarks/global-bench-results.json
 
@@ -488,7 +506,7 @@ class BenchGlobal(Benchmark):
     Benchmark the global optimizers using the go_benchmark_functions
     suite
     """
-    timeout = 300
+    timeout = 180
 
     _functions = dict([
         item for item in inspect.getmembers(gbf, inspect.isclass)
@@ -506,9 +524,9 @@ class BenchGlobal(Benchmark):
         _enabled_functions = list(_functions.keys())
 
     params = [
-        list(_functions.keys()),
+        _enabled_functions,
         ["success%", "<nfev>", "average time"],
-        ['DE', 'basinh.', 'DA', 'DIRECT', 'SHGO'],
+        ['DE', 'basinh.', 'DA', 'DIRECT', 'SHGO', 'biteopt'],
     ]
     param_names = ["test function", "result type", "solver"]
 

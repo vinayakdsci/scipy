@@ -3,6 +3,11 @@ import numpy as np
 from numpy import asarray_chkfinite, single, asarray, array
 from numpy.linalg import norm
 
+from scipy._lib._util import _apply_over_batch
+from scipy._lib.deprecation import _NoValue
+
+import os
+import warnings
 
 # Local imports.
 from ._misc import LinAlgError, _datacopied
@@ -14,7 +19,13 @@ __all__ = ['schur', 'rsf2csf']
 _double_precision = ['i', 'l', 'd']
 
 
-def schur(a, output='real', lwork=None, overwrite_a=False, sort=None,
+def _schur_signature(a, output='real', lwork=_NoValue, overwrite_a=False, sort=None,
+                     check_finite=True):
+    return "(i,i)->(i,i),(i,i),()" if sort else "(i,i)->(i,i),(i,i)"
+
+
+@_apply_over_batch(('a', 2), signature=_schur_signature)
+def schur(a, output='real', lwork=_NoValue, overwrite_a=False, sort=None,
           check_finite=True):
     """
     Compute Schur decomposition of a matrix.
@@ -33,24 +44,36 @@ def schur(a, output='real', lwork=None, overwrite_a=False, sort=None,
     a : (M, M) array_like
         Matrix to decompose
     output : {'real', 'complex'}, optional
-        Construct the real or complex Schur decomposition (for real matrices).
+        When the dtype of `a` is real, this specifies whether to compute
+        the real or complex Schur decomposition.
+        When the dtype of `a` is complex, this argument is ignored, and the
+        complex Schur decomposition is computed.
     lwork : int, optional
         Work array size. If None or -1, it is automatically computed.
+
+        .. deprecated:: 2.0.0
+            This keyword is deprecated as well as no longer in use and will be
+            removed in 2.2.0.
+
     overwrite_a : bool, optional
         Whether to overwrite data in a (may improve performance).
+        See :ref:`tutorial_linalg_overwrite` for details.
     sort : {None, callable, 'lhp', 'rhp', 'iuc', 'ouc'}, optional
         Specifies whether the upper eigenvalues should be sorted. A callable
-        may be passed that, given a eigenvalue, returns a boolean denoting
+        may be passed that, given an eigenvalue, returns a boolean denoting
         whether the eigenvalue should be sorted to the top-left (True).
-        If output='real', the callable should have two arguments, the first
-        one being the real part of the eigenvalue, the second one being
-        the imaginary part.
+
+        - If ``output='complex'`` OR the dtype of `a` is complex, the callable
+          should have one argument: the eigenvalue expressed as a complex number.
+        - If ``output='real'`` AND the dtype of `a` is real, the callable should have
+          two arguments: the real and imaginary parts of the eigenvalue, respectively.
+
         Alternatively, string parameters may be used::
 
-            'lhp'   Left-hand plane (x.real < 0.0)
-            'rhp'   Right-hand plane (x.real > 0.0)
-            'iuc'   Inside the unit circle (x*x.conjugate() <= 1.0)
-            'ouc'   Outside the unit circle (x*x.conjugate() > 1.0)
+            'lhp'   Left-hand plane (real(eigenvalue) < 0.0)
+            'rhp'   Right-hand plane (real(eigenvalue) >= 0.0)
+            'iuc'   Inside the unit circle (abs(eigenvalue) <= 1.0)
+            'ouc'   Outside the unit circle (abs(eigenvalue) > 1.0)
 
         Defaults to None (no sorting).
     check_finite : bool, optional
@@ -63,11 +86,13 @@ def schur(a, output='real', lwork=None, overwrite_a=False, sort=None,
     T : (M, M) ndarray
         Schur form of A. It is real-valued for the real Schur decomposition.
     Z : (M, M) ndarray
-        An unitary Schur transformation matrix for A.
+        A unitary Schur transformation matrix for A.
         It is real-valued for the real Schur decomposition.
     sdim : int
         If and only if sorting was requested, a third return value will
         contain the number of eigenvalues satisfying the sort condition.
+        Note that complex conjugate pairs for which the condition is true
+        for either eigenvalue count as 2.
 
     Raises
     ------
@@ -109,12 +134,23 @@ def schur(a, output='real', lwork=None, overwrite_a=False, sort=None,
     >>> eigvals(T2)
     array([2.65896708, -0.32948354+0.80225456j, -0.32948354-0.80225456j])   # may vary
 
-    An arbitrary custom eig-sorting condition, having positive imaginary part,
-    which is satisfied by only one eigenvalue
+    A custom eigenvalue-sorting condition that sorts by positive imaginary part
+    is satisfied by only one eigenvalue.
 
-    >>> T3, Z3, sdim = schur(A, output='complex', sort=lambda x: x.imag > 0)
+    >>> _, _, sdim = schur(A, output='complex', sort=lambda x: x.imag > 1e-15)
     >>> sdim
     1
+
+    When ``output='real'`` and the array `a` is real, the `sort` callable must accept
+    the real and imaginary parts as separate arguments. Note that now the complex
+    eigenvalues ``-0.32948354+0.80225456j`` and ``-0.32948354-0.80225456j`` will be
+    treated as a complex conjugate pair, and according to the `sdim` documentation,
+    complex conjugate pairs for which the condition is True for *either* eigenvalue
+    increase `sdim` by *two*.
+
+    >>> _, _, sdim = schur(A, output='real', sort=lambda x, y: y > 1e-15)
+    >>> sdim
+    2
 
     """
     if output not in ['real', 'complex', 'r', 'c']:
@@ -127,6 +163,16 @@ def schur(a, output='real', lwork=None, overwrite_a=False, sort=None,
         a1 = asarray(a, dtype=np.dtype("long"))
     if len(a1.shape) != 2 or (a1.shape[0] != a1.shape[1]):
         raise ValueError('expected square matrix')
+
+    if lwork is not _NoValue:
+        warnings.warn(
+            "scipy.linalg.schur: the `lwork` keyword is deprecated and no longer in use"
+            " as of SciPy 2.0.0 and will be removed in SciPy 2.2.0",
+            DeprecationWarning,
+            skip_file_prefixes=(os.path.dirname(__file__),)
+        )
+
+    lwork = None
 
     typ = a1.dtype.char
     if output in ['complex', 'c'] and typ not in ['F', 'D']:
@@ -154,24 +200,26 @@ def schur(a, output='real', lwork=None, overwrite_a=False, sort=None,
 
     if sort is None:
         sort_t = 0
-        def sfunction(x):
+        def sfunction(x, y=None):
             return None
     else:
         sort_t = 1
         if callable(sort):
             sfunction = sort
         elif sort == 'lhp':
-            def sfunction(x):
+            def sfunction(x, y=None):
                 return x.real < 0.0
         elif sort == 'rhp':
-            def sfunction(x):
+            def sfunction(x, y=None):
                 return x.real >= 0.0
         elif sort == 'iuc':
-            def sfunction(x):
-                return abs(x) <= 1.0
+            def sfunction(x, y=None):
+                z = x if y is None else x + y*1j
+                return abs(z) <= 1.0
         elif sort == 'ouc':
-            def sfunction(x):
-                return abs(x) > 1.0
+            def sfunction(x, y=None):
+                z = x if y is None else x + y*1j
+                return abs(z) > 1.0
         else:
             raise ValueError("'sort' parameter must either be 'None', or a "
                              "callable, or one of ('lhp','rhp','iuc','ouc')")
@@ -227,6 +275,8 @@ def _castCopy(type, *arrays):
         return cast_arrays
 
 
+@_apply_over_batch(('T', 2), ('Z', 2),
+                   signature='(i,i),(i,i)->complex(i,i),complex(i,i)')
 def rsf2csf(T, Z, check_finite=True):
     """
     Convert real Schur form to complex Schur form.

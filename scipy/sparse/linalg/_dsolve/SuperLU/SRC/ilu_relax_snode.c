@@ -1,4 +1,4 @@
-/*! \file
+/*
 Copyright (c) 2003, The Regents of the University of California, through
 Lawrence Berkeley National Laboratory (subject to receipt of any required 
 approvals from U.S. Dept. of Energy) 
@@ -8,14 +8,15 @@ All rights reserved.
 The source code is distributed under BSD license, see the file License.txt
 at the top-level directory.
 */
-/*! @file ilu_relax_snode.c
- * \brief Identify initial relaxed supernodes
- *
- * <pre>
+/*
  * -- SuperLU routine (version 4.0) --
  * Lawrence Berkeley National Laboratory
  * June 1, 2009
- * </pre>
+ */
+/*! \file
+ * \brief Identify initial relaxed supernodes
+ *
+ * \ingroup Common
  */
 
 #include "slu_ddefs.h"
@@ -32,7 +33,7 @@ at the top-level directory.
 void
 ilu_relax_snode (
 	      const	int n,
-	      int	*et,	       /* column elimination tree */
+	      const int	*et,	       /* column elimination tree */
 	      const int relax_columns, /* max no of columns allowed in a
 					  relaxed snode */
 	      int	*descendants,  /* no of descendants of each node
@@ -50,8 +51,8 @@ ilu_relax_snode (
     register int j, f, parent;
     register int snode_start;	/* beginning of a snode */
 
-    ifill (relax_end, n, EMPTY);
-    ifill (relax_fsupc, n, EMPTY);
+    ifill (relax_end, n, SLU_EMPTY);
+    ifill (relax_fsupc, n, SLU_EMPTY);
     for (j = 0; j < n; j++) descendants[j] = 0;
 
     /* Compute the number of descendants of each node in the etree */
@@ -74,6 +75,7 @@ ilu_relax_snode (
 	j++;
 	relax_fsupc[f++] = snode_start;
 	/* Search for a new leaf */
-	while ( descendants[j] != 0 && j < n ) j++;
+	while (j < n && descendants[j] != 0)
+	    j++;
     }
 }

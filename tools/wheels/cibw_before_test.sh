@@ -1,8 +1,9 @@
-set -ex
+set -xe
 
-FREE_THREADED_BUILD="$(python -c"import sysconfig; print(bool(sysconfig.get_config_var('Py_GIL_DISABLED')))")"
-if [[ $FREE_THREADED_BUILD == "True" ]]; then
-    # TODO: delete when numpy is buildable under free-threaded python
-    python -m pip install -U --pre pip
-    python -m pip install -i https://pypi.anaconda.org/scientific-python-nightly-wheels/simple numpy cython
-fi
+PROJECT_DIR="${1:-$PWD}"
+SCIPY_SRC_DIR="${1:-$PWD}"
+
+# install test dependencies via uv
+PYTHON_EXE="$(python -c 'import sys; print(sys.executable)')"
+uv export --project "$PROJECT_DIR" --only-group test-core --frozen | \
+    uv pip install --python "$PYTHON_EXE" --no-deps --require-hashes -r -

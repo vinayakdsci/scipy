@@ -94,12 +94,14 @@ sp_ctrsv(char *uplo, char *trans, char *diag, SuperMatrix *L,
     SCformat *Lstore;
     NCformat *Ustore;
     singlecomplex   *Lval, *Uval;
-    int incx = 1, incy = 1;
+    slu_blasint incx = 1, incy = 1;
     singlecomplex temp;
     singlecomplex alpha = {1.0, 0.0}, beta = {1.0, 0.0};
     singlecomplex comp_zero = {0.0, 0.0};
-    int nrow, irow, jcol;
-    int fsupc, nsupr, nsupc;
+    slu_blasint nrow;
+    int irow, jcol;
+    int fsupc;
+    slu_blasint nsupr, nsupc;
     int_t luptr, istart, i, k, iptr;
     singlecomplex *work;
     flops_t solve_ops;
@@ -125,7 +127,7 @@ sp_ctrsv(char *uplo, char *trans, char *diag, SuperMatrix *L,
     Uval = Ustore->nzval;
     solve_ops = 0;
 
-    if ( !(work = complexCalloc(L->nrow)) )
+    if ( !(work = singlecomplexCalloc(L->nrow)) )
 	ABORT("Malloc fails for work in sp_ctrsv().");
     
     if ( strncmp(trans, "N", 1)==0 ) {	/* Form x := inv(A)*x. */

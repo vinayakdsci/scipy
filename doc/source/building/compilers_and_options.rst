@@ -4,8 +4,8 @@ Compiler selection and customizing a build
 Selecting a specific compiler
 -----------------------------
 
-Meson supports the standard environment variables ``CC``, ``CXX`` and ``FC`` to
-select specific C, C++ and/or Fortran compilers. These environment variables are
+Meson supports the standard environment variables ``CC`` and ``CXX`` to select
+specific C and/or C++ compilers. These environment variables are
 documented in `the reference tables in the Meson docs
 <https://mesonbuild.com/Reference-tables.html#compiler-and-linker-flag-environment-variables>`__.
 
@@ -35,7 +35,7 @@ For a comprehensive overview of options, see `Meson's builtin options docs page
 <https://mesonbuild.com/Builtin-options.html>`__.
 
 Meson also supports the standard environment variables ``CFLAGS``,
-``CXXFLAGS``, ``FFLAGS`` and ``LDFLAGS`` to inject extra flags - with the same
+``CXXFLAGS`` and ``LDFLAGS`` to inject extra flags - with the same
 caveat as in the previous section about those environment variables being
 picked up only for a clean build and not an incremental build.
 
@@ -52,10 +52,10 @@ you can configure the build as following to use the ``debug`` build type::
 
     meson setup build --buildtype debug  --prefix=$PWD/build-install
 
-Now, you can use the ``dev.py`` interface for further building, installing and
+Now, you can use the ``spin`` interface for further building, installing and
 testing SciPy::
 
-    python dev.py -s linalg
+    spin -s linalg
 
 This will work because after initial configuration, Meson will remember the
 config options.
@@ -75,7 +75,32 @@ such that you have at least 2 GB RAM per job. For example, to launch 6 jobs::
 
 or::
 
-    python dev.py build -j6
+    spin build -j6
+
+
+Controlling installed configuration details
+--------------------------------------------
+
+``scipy.show_config()`` provides a lot of detail about build-time dependencies
+and build machine/configuration. This is quite useful for diagnostics, but
+not reproducible across machines - at least for relocatable packages - because
+it embeds build machine paths and compiler options (which can also contain
+paths). There is a build option to achieve reproducible builds:
+``-Dconfig-output``.
+
+The default, ``-Dconfig-output=auto``, selects portable output when
+``SOURCE_DATE_EPOCH`` is set at Meson configuration time, and full output
+otherwise. Redistributors can always omit build-host paths and other
+host-dependent details from binary artifacts with::
+
+    python -m build -Csetup-args=-Dconfig-output=portable
+
+Use ``-Dconfig-output=full`` to retain detailed diagnostics even when
+``SOURCE_DATE_EPOCH`` is set.  Portable mode reports paths,
+compiler commands, all compiler and linker flags (including optimization
+flags), and OpenBLAS configuration as ``unknown``.  It keeps compiler IDs,
+versions, linker IDs, dependency versions, ABI information, and machine details.
+Explicit ``full`` and ``portable`` settings override the automatic choice.
 
 
 Use GCC and Clang builds in parallel
@@ -89,31 +114,29 @@ For example, let us build using GCC and Clang.
 
 1. Build with GCC::
 
-    python dev.py build
+    spin build
 
 Using the above command, meson will build with the (default) GCC compilers in
 the ``build`` directory, and install to the ``build-install`` directory.
 
 2. Build with Clang::
 
-    CC=clang CXX=clang++ FC=gfortran python dev.py --build-dir=build-clang build
+    CC=clang CXX=clang++ spin --build-dir=build-clang build
 
-Using the above commands, Meson will build with the Clang, Clang++ and Gfortran
+Using the above commands, Meson will build with the Clang and Clang++
 compilers in the ``build-clang`` directory, and then install SciPy into
 ``build-clang-install``.
 
 Meson will remember the compiler selection for the ``build-clang`` directory and
 it cannot be changed, so each future invocation of
-``python dev.py --build-dir=build-clang <command>`` it will automatically use Clang.
+``spin --build-dir=build-clang <command>`` it will automatically use Clang.
 
 Tip: use an alias to make this easier to use, e.g.,
-``alias dev-clang="python dev.py --build-dir=build-clang"`` and then
+``alias dev-clang="spin --build-dir=build-clang"`` and then
 ``dev-clang build``.
 
 A common reason to have two builds is to compare between them. For example,
 to run the ``scipy.linalg`` tests for builds with both compilers, do::
 
-    python dev.py -s linalg                          # run tests for the GCC build
-    python dev.py --build-dir build-clang -s linalg  # run tests for the Clang build
-
-
+    spin -s linalg                          # run tests for the GCC build
+    spin --build-dir build-clang -s linalg  # run tests for the Clang build

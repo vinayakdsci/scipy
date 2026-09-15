@@ -30,6 +30,11 @@ at the top-level directory.
 
 typedef struct { float r, i; } singlecomplex;
 
+#if defined(SUPERLU_TYPEDEF_COMPLEX) || DOXYGEN
+//! \brief backward compatibility with older versions of SuperLU
+//! Add -D enable_compatibility_complex=ON to your CMake call
+typedef singlecomplex complex;
+#endif
 
 /* Macro definitions */
 
@@ -68,7 +73,7 @@ extern "C" {
 #endif
 
 /* Prototypes for functions in scomplex.c */
-void c_div(singlecomplex *, singlecomplex *, singlecomplex *);
+void c_div(singlecomplex *, const singlecomplex *, const singlecomplex *);
 double c_abs(singlecomplex *);     /* exact */
 double c_abs1(singlecomplex *);    /* approximate */
 void c_exp(singlecomplex *, singlecomplex *);

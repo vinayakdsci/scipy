@@ -51,8 +51,8 @@ although technically
 is the probability density function for a discrete distribution [#]_ .
 
 .. [#]
-    XXX: Unknown layout Plain Layout: Note that we will be using :math:`p` to represent the probability mass function and a parameter (a
-    XXX: probability). The usage should be obvious from context.
+    Note that we will be using :math:`p` to represent the probability mass function and a parameter (a
+    probability). The usage should be obvious from context.
 
 
 Cumulative Distribution Function (CDF)
@@ -78,9 +78,9 @@ The survival function is just
 
 .. math::
 
-    S\left(x\right)=1-F\left(x\right)=P\left[X>k\right]
+    S\left(x\right)=1-F\left(x\right)=P\left[X>x\right]
 
-the probability that the random variable is strictly larger than :math:`k` .
+the probability that the random variable is strictly larger than :math:`x` .
 
 .. _discrete-ppf:
 

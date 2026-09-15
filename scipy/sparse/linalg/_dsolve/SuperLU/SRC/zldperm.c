@@ -13,9 +13,10 @@ at the top-level directory.
  * \brief Finds a row permutation so that the matrix has large entries on the diagonal
  *
  * <pre>
- * -- SuperLU routine (version 4.0) --
+ * -- SuperLU routine (version 7.0.0) --
  * Lawrence Berkeley National Laboratory.
  * June 30, 2009
+ * August 2024
  * </pre>
  */
 
@@ -116,7 +117,7 @@ zldperm(int job, int n, int_t nnz, int_t colptr[], int_t adjncy[],
     for (i = 0; i <= n; ++i) ++colptr[i];
     for (i = 0; i < nnz; ++i) ++adjncy[i];
 #if ( DEBUGlevel>=2 )
-    printf("LDPERM(): n %d, nnz %d\n", n, nnz);
+    printf("LDPERM(): n %d, nnz %lld\n", n, (long long) nnz);
     slu_PrintInt10("colptr", n+1, colptr);
     slu_PrintInt10("adjncy", nnz, adjncy);
 #endif
@@ -152,7 +153,7 @@ zldperm(int job, int n, int_t nnz, int_t colptr[], int_t adjncy[],
 
 #if ( DEBUGlevel>=2 )
     slu_PrintInt10("perm", n, perm);
-    printf(".. After MC64AD info %lld\tsize of matching %d\n", (long long)info[0], num);
+    printf(".. After MC64AD info %lld\tsize of matching %lld\n", (long long)info[0], (long long) num);
 #endif
     if ( info[0] == 1 ) { /* Structurally singular */
         printf(".. The last %d permutations:\n", (int)(n-num));

@@ -13,10 +13,11 @@ at the top-level directory.
  * \brief Solves the system of linear equations A*X=B 
  *
  * <pre>
- * -- SuperLU routine (version 3.0) --
+ * -- SuperLU routine (version 7.0.0) --
  * Univ. of California Berkeley, Xerox Palo Alto Research Center,
  * and Lawrence Berkeley National Lab.
  * October 15, 2003
+ * August 2024
  * </pre>  
  */
 #include "slu_ddefs.h"
@@ -232,9 +233,12 @@ dgssv(superlu_options_t *options, SuperMatrix *A, int *perm_c, int *perm_r,
         /* Solve the system A*X=B, overwriting B with X. */
 	int info1;
         dgstrs (trans, L, U, perm_c, perm_r, B, stat, &info1);
-    } else {
+    }
+#if ( PRNTlevel>=1 )
+     else {
         printf("dgstrf info %lld\n", (long long) *info); fflush(stdout);
     }
+#endif
     
     utime[SOLVE] = SuperLU_timer_() - t;
 

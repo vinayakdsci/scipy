@@ -1,4 +1,4 @@
-/*! \file
+/*
 Copyright (c) 2003, The Regents of the University of California, through
 Lawrence Berkeley National Laboratory (subject to receipt of any required 
 approvals from U.S. Dept. of Energy) 
@@ -8,6 +8,11 @@ All rights reserved.
 The source code is distributed under BSD license, see the file License.txt
 at the top-level directory.
 */
+/*! \file
+ * \brief Minimum degree algorithm
+ *
+ * \ingroup Common
+ */
 #include "superlu_config.h"
 
 typedef int_t shortint;
@@ -70,17 +75,17 @@ typedef int_t shortint;
     /* Local variables */
     int_t mdeg, ehead, i, mdlmt, mdnode;
     extern /* Subroutine */
-	int slu_mmdelm_(int_t *mdnode, int_t *xadj, shortint *adjncy,
-			shortint *dhead, int *dforw, int *dbakw, shortint *qsize, 
-			shortint *llist, shortint *marker, int_t *maxint, int_t *tag),
-	slu_mmdupd_(int_t *ehead, int *neqns, int_t *xadj, 
-		    shortint *adjncy, int_t *delta, int_t *mdeg, shortint *dhead, 
-		    int *dforw, int *dbakw, shortint *qsize, shortint *llist, 
-		    shortint *marker, int_t *maxint, int_t *tag),
-	slu_mmdint_(int *neqns, int_t *xadj, shortint *adjncy, 
-			shortint *dhead, int *dforw, int *dbakw, shortint *qsize, 
-			shortint *llist, shortint *marker),
-	slu_mmdnum_(int *neqns, int *perm, int *invp, shortint *qsize);
+    int slu_mmdelm_(const int_t *mdnode, int_t *xadj, shortint *adjncy,
+                    shortint *dhead, int *dforw, int *dbakw, shortint *qsize,
+                    shortint *llist, shortint *marker, const int_t *maxint, const int_t *tag),
+    slu_mmdupd_(const int_t *ehead, const int *neqns, int_t *xadj,
+                shortint *adjncy, const int_t *delta, int_t *mdeg, shortint *dhead,
+                int *dforw, int *dbakw, shortint *qsize, shortint *llist,
+                shortint *marker, const int_t *maxint, int_t *tag),
+    slu_mmdint_(const int *neqns, int_t *xadj, shortint *adjncy,
+                shortint *dhead, int *dforw, int *dbakw, shortint *qsize,
+                shortint *llist, shortint *marker),
+    slu_mmdnum_(const int *neqns, int *perm, int *invp, shortint *qsize);
 
     int_t nextmd, tag, num;
 
@@ -250,7 +255,8 @@ L1000:
 
 /* *************************************************************** */
 
-/* Subroutine */ int slu_mmdint_(int *neqns, int_t *xadj, shortint *adjncy, 
+/* Subroutine */
+int slu_mmdint_(const int *neqns, int_t *xadj, shortint *adjncy,
 	shortint *dhead, int *dforw, int *dbakw, shortint *qsize, 
 	shortint *llist, shortint *marker)
 {
@@ -330,9 +336,10 @@ L1000:
 
 /* *************************************************************** */
 
-/* Subroutine */ int slu_mmdelm_(int_t *mdnode, int_t *xadj, shortint *adjncy,
-	 shortint *dhead, int *dforw, int *dbakw, shortint *qsize, 
-	shortint *llist, shortint *marker, int_t *maxint, int_t *tag)
+/* Subroutine */
+int slu_mmdelm_(const int_t *mdnode, int_t *xadj, shortint *adjncy,
+                shortint *dhead, int *dforw, int *dbakw, shortint *qsize,
+                shortint *llist, shortint *marker, const int_t *maxint, const int_t *tag)
 {
     /* System generated locals */
     int_t i__1, i__2;
@@ -578,10 +585,11 @@ L1800:
 /* *************************************************************** */
 
 
-/* Subroutine */ int slu_mmdupd_(int_t *ehead, int *neqns, int_t *xadj, 
-	shortint *adjncy, int_t *delta, int_t *mdeg, shortint *dhead, 
-        int *dforw, int *dbakw, shortint *qsize, shortint *llist, 
-	shortint *marker, int_t *maxint, int_t *tag)
+/* Subroutine */
+int slu_mmdupd_(const int_t *ehead, const int *neqns, int_t *xadj,
+                shortint *adjncy, const int_t *delta, int_t *mdeg, shortint *dhead,
+                int *dforw, int *dbakw, shortint *qsize, shortint *llist,
+                shortint *marker, const int_t *maxint, int_t *tag)
 {
     /* System generated locals */
     int_t i__1, i__2;
@@ -934,8 +942,8 @@ L2300:
 
 /* *************************************************************** */
 
-/* Subroutine */ int slu_mmdnum_(int *neqns, int *perm, int *invp, 
-	shortint *qsize)
+/* Subroutine */
+int slu_mmdnum_(const int *neqns, int *perm, int *invp, shortint *qsize)
 {
     /* System generated locals */
 

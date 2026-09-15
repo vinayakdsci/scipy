@@ -169,7 +169,7 @@ cCompRow_to_CompCol(int m, int n, int_t nnz,
     int_t *marker;
 
     /* Allocate storage for another copy of the matrix. */
-    *at = (singlecomplex *) complexMalloc(nnz);
+    *at = (singlecomplex *) singlecomplexMalloc(nnz);
     *rowind = (int_t *) intMalloc(nnz);
     *colptr = (int_t *) intMalloc(n+1);
     marker = (int_t *) intCalloc(n);
@@ -389,7 +389,7 @@ cFillRHS(trans_t trans, int nrhs, singlecomplex *x, int ldx,
 
 }
 
-/*! \brief Fills a complex precision array with a given value.
+/*! \brief Fills a singlecomplex precision array with a given value.
  */
 void 
 cfill(singlecomplex *a, int alen, singlecomplex dval)
@@ -432,7 +432,7 @@ void cinf_norm_error(int nrhs, SuperMatrix *X, singlecomplex *xtrue)
 void
 cPrintPerf(SuperMatrix *L, SuperMatrix *U, mem_usage_t *mem_usage,
            float rpg, float rcond, float *ferr,
-           float *berr, char *equed, SuperLUStat_t *stat)
+           const float *berr, const char *equed, SuperLUStat_t *stat)
 {
     SCformat *Lstore;
     NCformat *Ustore;
@@ -474,7 +474,7 @@ cPrintPerf(SuperMatrix *L, SuperMatrix *U, mem_usage_t *mem_usage,
 
 
 int
-print_complex_vec(char *what, int n, singlecomplex *vec)
+print_singlecomplex_vec(const char *what, int n, const singlecomplex *vec)
 {
     int i;
     printf("%s: n %d\n", what, n);

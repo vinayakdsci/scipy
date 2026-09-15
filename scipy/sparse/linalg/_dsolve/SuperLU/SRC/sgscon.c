@@ -13,10 +13,11 @@ at the top-level directory.
  * \brief Estimates reciprocal of the condition number of a general matrix
  * 
  * <pre>
- * -- SuperLU routine (version 5.0) --
+ * -- SuperLU routine (version 7.0.0) --
  * Univ. of California Berkeley, Xerox Palo Alto Research Center,
  * and Lawrence Berkeley National Lab.
  * July 25, 2015
+ * August 2024
  *
  * Modified from lapack routines SGECON.
  * </pre> 
@@ -37,7 +38,7 @@ at the top-level directory.
  *
  *   SGSCON estimates the reciprocal of the condition number of a general 
  *   real matrix A, in either the 1-norm or the infinity-norm, using   
- *   the LU factorization computed by SGETRF.   *
+ *   the LU factorization computed by SGSTRF.   *
  *
  *   An estimate is obtained for norm(inv(A)), and the reciprocal of the   
  *   condition number is computed as   

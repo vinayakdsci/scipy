@@ -1,4 +1,4 @@
-/*! \file
+/*
 Copyright (c) 2003, The Regents of the University of California, through
 Lawrence Berkeley National Laboratory (subject to receipt of any required 
 approvals from U.S. Dept. of Energy) 
@@ -8,10 +8,7 @@ All rights reserved.
 The source code is distributed under BSD license, see the file License.txt
 at the top-level directory.
 */
-/*! @file heap_relax_snode.c
- * \brief Identify the initial relaxed supernodes
- *
- * <pre>
+/*
  * -- SuperLU routine (version 3.0) --
  * Univ. of California Berkeley, Xerox Palo Alto Research Center,
  * and Lawrence Berkeley National Lab.
@@ -27,7 +24,11 @@ at the top-level directory.
  * Permission to modify the code and to distribute modified code is
  * granted, provided the above notices are retained, and a notice that
  * the code was modified is included with the above copyright notice.
- * </pre>
+ */
+/*! \file
+ * \brief Identify the initial relaxed supernodes
+ *
+ * \ingroup Common
  */
 
 #include "slu_ddefs.h"
@@ -79,7 +80,7 @@ heap_relax_snode (
     for (i = 0; i < n; ++i) et[i] = iwork[i];
 
     /* Compute the number of descendants of each node in the etree */
-    ifill (relax_end, n, EMPTY);
+    ifill (relax_end, n, SLU_EMPTY);
     for (j = 0; j < n; j++) descendants[j] = 0;
     for (j = 0; j < n; j++) {
 	parent = et[j];
@@ -122,7 +123,8 @@ heap_relax_snode (
 	}
 	j++;
 	/* Search for a new leaf */
-	while ( descendants[j] != 0 && j < n ) j++;
+	while (j < n && descendants[j] != 0)
+	    j++;
     }
 
 #if ( PRNTlevel>=1 )

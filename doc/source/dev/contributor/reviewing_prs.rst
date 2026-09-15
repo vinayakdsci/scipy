@@ -66,15 +66,15 @@ pull request (e.g. ``10286`` for `PR #10286`_). This immediately checks out
 the pull request into a branch with a name matching the one the PR author used.
 
 Assuming you set up your development environment according to
-:ref:`building-from-source`, you can now activate your development environment::
+:ref:`building-contributor`, you can now activate your development environment::
 
    conda activate scipy-dev
 
 build the code and test it::
 
-   python dev.py test -v
+   spin test -v
 
-and if you ``import`` SciPy from within IPython (start it with ``python dev.py
+and if you ``import`` SciPy from within IPython (start it with ``spin
 ipython``), you'll be importing the author's modified version of SciPy.
 
 If you want to collaborate with the author on their PR, you might instead

@@ -3,7 +3,7 @@ from warnings import warn
 from ._basic import rfft, irfft
 from ..special import loggamma, poch
 
-from scipy._lib._array_api import array_namespace, copy
+from scipy._lib._array_api import array_namespace, xp_capabilities, xp_device
 
 __all__ = ['fht', 'ifht', 'fhtoffset']
 
@@ -13,6 +13,7 @@ LN_2 = np.log(2)
 
 def fht(a, dln, mu, offset=0.0, bias=0.0):
     xp = array_namespace(a)
+    a = xp.asarray(a)
 
     # size of transform
     n = a.shape[-1]
@@ -21,11 +22,12 @@ def fht(a, dln, mu, offset=0.0, bias=0.0):
     if bias != 0:
         # a_q(r) = a(r) (r/r_c)^{-q}
         j_c = (n-1)/2
-        j = xp.arange(n, dtype=xp.float64)
+        j = xp.arange(n, dtype=xp.float64, device=xp_device(a))
         a = a * xp.exp(-bias*(j - j_c)*dln)
 
     # compute FHT coefficients
-    u = xp.asarray(fhtcoeff(n, dln, mu, offset=offset, bias=bias))
+    u = xp.asarray(fhtcoeff(n, dln, mu, offset=offset, bias=bias),
+                   device=xp_device(a))
 
     # transform
     A = _fhtq(a, u, xp=xp)
@@ -40,6 +42,7 @@ def fht(a, dln, mu, offset=0.0, bias=0.0):
 
 def ifht(A, dln, mu, offset=0.0, bias=0.0):
     xp = array_namespace(A)
+    A = xp.asarray(A)
 
     # size of transform
     n = A.shape[-1]
@@ -48,11 +51,12 @@ def ifht(A, dln, mu, offset=0.0, bias=0.0):
     if bias != 0:
         # A_q(k) = A(k) (k/k_c)^{q} (k_c r_c)^{q}
         j_c = (n-1)/2
-        j = xp.arange(n, dtype=xp.float64)
+        j = xp.arange(n, dtype=xp.float64, device=xp_device(A))
         A = A * xp.exp(bias*((j - j_c)*dln + offset))
 
     # compute FHT coefficients
-    u = xp.asarray(fhtcoeff(n, dln, mu, offset=offset, bias=bias, inverse=True))
+    u = xp.asarray(fhtcoeff(n, dln, mu, offset=offset, bias=bias, inverse=True),
+                   device=xp_device(A))
 
     # transform
     a = _fhtq(A, u, inverse=True, xp=xp)
@@ -90,7 +94,8 @@ def fhtcoeff(n, dln, mu, offset=0.0, bias=0.0, inverse=False):
     np.exp(u, out=u)
 
     # fix last coefficient to be real
-    u.imag[-1] = 0
+    if n % 2 == 0:
+        u.imag[-1] = 0
 
     # deal with special cases
     if not np.isfinite(u[0]):
@@ -104,17 +109,18 @@ def fhtcoeff(n, dln, mu, offset=0.0, bias=0.0, inverse=False):
     if np.isinf(u[0]) and not inverse:
         warn('singular transform; consider changing the bias', stacklevel=3)
         # fix coefficient to obtain (potentially correct) transform anyway
-        u = copy(u)
+        u = np.copy(u)
         u[0] = 0
     elif u[0] == 0 and inverse:
         warn('singular inverse transform; consider changing the bias', stacklevel=3)
         # fix coefficient to obtain (potentially correct) inverse anyway
-        u = copy(u)
+        u = np.copy(u)
         u[0] = np.inf
 
     return u
 
 
+@xp_capabilities(out_of_scope=True)
 def fhtoffset(dln, mu, initial=0.0, bias=0.0):
     """Return optimal offset for a fast Hankel transform.
 

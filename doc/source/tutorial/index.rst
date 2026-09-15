@@ -11,64 +11,82 @@ SciPy User Guide
 SciPy is a collection of mathematical algorithms and convenience functions built
 on NumPy_ . It adds significant power to Python by providing the user with
 high-level commands and classes for manipulating and visualizing data.
+The purpose of this user guide is to provide an overview of the functionality of
+each subpackage along with some general application notes.
 
 .. _NumPy: https://numpy.org
 
-Subpackages
------------
+The following table lists the subpackages SciPy provides. The left column contains the
+subpackage names, whereas the right column provides a description and links to the
+corresponding chapter of this User Guide (if available):
 
-SciPy is organized into subpackages covering different scientific
-computing domains. These are summarized in the following table:
+.. list-table::
+    :header-rows: 1
 
-==================  ======================================================
-Subpackage          Description
-==================  ======================================================
-`cluster`           Clustering algorithms
-`constants`         Physical and mathematical constants
-`differentiate`     Finite difference differentiation tools
-`fft`               Discrete Fourier transforms
-`fftpack`           Fast Fourier Transform routines (legacy)
-`integrate`         Integration and ordinary differential equation solvers
-`interpolate`       Interpolation and smoothing splines
-`io`                Input and Output
-`linalg`            Linear algebra
-`ndimage`           N-dimensional image processing
-`odr`               Orthogonal distance regression
-`optimize`          Optimization and root-finding routines
-`signal`            Signal processing
-`sparse`            Sparse matrices and associated routines
-`spatial`           Spatial data structures and algorithms
-`special`           Special functions
-`stats`             Statistical distributions and functions
-==================  ======================================================
+    * - Subpackage
+      - Description (link to User Guide chapter)
+    * - ``scipy.cluster``
+      - Clustering algorithms
+    * - ``scipy.constants``
+      - Physical and mathematical constants
+    * - ``scipy.differentiate``
+      - Finite difference differentiation tools
+    * - ``scipy.fft``
+      - :doc:`./fft`
+    * - ``scipy.fftpack``
+      - Fast Fourier Transform routines (legacy)
+    * - ``scipy.integrate``
+      - :doc:`./integrate`
+    * - ``scipy.interpolate``
+      - :doc:`./interpolate`
+    * - ``scipy.io``
+      - :doc:`./io`
+    * - ``scipy.linalg``
+      - :doc:`./linalg`
+    * - ``scipy.ndimage``
+      - :doc:`./ndimage`
+    * - ``scipy.optimize``
+      - :doc:`./optimize`
+    * - ``scipy.signal``
+      - :doc:`./signal`
+    * - ``scipy.sparse``
+      - :doc:`./sparse`
+    * - ``scipy.spatial``
+      - :doc:`./spatial`
+    * - ``scipy.special``
+      - :doc:`./special`
+    * - ``scipy.stats``
+      - :doc:`./stats`
 
-For guidance on organizing and importing functions from SciPy subpackages, refer to the `Guidelines for Importing Functions from SciPy <https://scipy.github.io/devdocs/reference/index.html#guidelines-for-importing-functions-from-scipy>`_.
 
-Below, you can find the complete user guide organized by subpackages.
+There are also additional user guides for these topics:
 
-.. raw:: latex
+- :doc:`./arpack` - Eigenvalue problem solver using iterative methods
+- :doc:`./csgraph` - Compressed Sparse Graph Routines
+- :ref:`scipy_parallel_execution`
+- :ref:`scipy_thread_safety`
+- :ref:`security`
 
-   \addtocontents{toc}{\protect\setcounter{tocdepth}{2}}
 
 .. toctree::
    :caption: User guide
-   :maxdepth: 1
+   :hidden:
 
-   special
-   integrate
-   optimize
-   interpolate
    fft
-   signal
+   integrate
+   interpolate
+   io
    linalg
+   ndimage
+   optimize
+   signal
    sparse
+   spatial
+   special
+   stats
    arpack
    csgraph
-   spatial
-   stats
-   ndimage
-   io
+   parallel_execution
+   security
+   thread_safety
 
-.. raw:: latex
-
-   \addtocontents{toc}{\protect\setcounter{tocdepth}{1}}
